@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using System.Net;
 
 namespace User.Function
 {
@@ -20,33 +22,40 @@ namespace User.Function
         }
 
         [Function("UserRegistration")]
-        public IActionResult Run([HttpTrigger(AuthorizationLevel.Function, "get", "post")] HttpRequest req)
+        public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Function, "get", "post")] HttpRequestData req)
         {
             _logger.LogInformation("C# HTTP trigger function processed a request.");
             
             // Parse the request body to get the user details
-            if (req.Method == HttpMethods.Get)
+            if (req.Method == "GET")
             {
-                // Handle GET request
-                var email = req.Query["email"];
+                
+                var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+                var email = query["email"];
 
                 if (string.IsNullOrEmpty(email))
                 {
-                    return new BadRequestObjectResult("Email is required.");
+                    var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badResponse.WriteStringAsync("Email is required.");
+                    return badResponse;
                 }
 
                 var user = _userService.GetUserByEmail(email);
                 if (user == null)
                 {
-                    return new NotFoundObjectResult("User not found.");
+                    var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
+                    await notFoundResponse.WriteStringAsync("User not found.");
+                    return notFoundResponse;
                 }
-                return new OkObjectResult(user);
+
+                var okResponse = req.CreateResponse(HttpStatusCode.OK);
+                await okResponse.WriteAsJsonAsync(user);
+                return okResponse;
                 
             }
-            else if (req.Method == HttpMethods.Post)
+            else if (req.Method == "POST")
             {
-                // Handle POST request
-                var requestBody = new StreamReader(req.Body).ReadToEnd();
+                var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
                 var user = JsonSerializer.Deserialize<UserReg>(requestBody, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
@@ -54,14 +63,19 @@ namespace User.Function
 
                 if (user == null || string.IsNullOrEmpty(user.Email) || string.IsNullOrEmpty(user.Password))
                 {
-                    return new BadRequestObjectResult("Invalid user data.");
-                }
+                    var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badResponse.WriteStringAsync("Invalid user data.");
+                    return badResponse;
+                }                
 
                 _userService.AddUser(user);
-                return new CreatedResult($"/users/{user.Id}", user);
+                var createdResponse = req.CreateResponse(HttpStatusCode.Created);
+                await createdResponse.WriteAsJsonAsync(user);
+                return createdResponse;
             }
-
-            return new OkObjectResult("Welcome to Azure Functions!");
+            var defaultResponse = req.CreateResponse(HttpStatusCode.OK);
+            await defaultResponse.WriteStringAsync("Welcome to Azure Functions!");
+            return defaultResponse;
         }
     }
 }

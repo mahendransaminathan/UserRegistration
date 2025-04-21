@@ -22,7 +22,7 @@ public class UserCosmosRepository : IUserRepository
 
     public async Task<UserReg> GetUserByEmail(string email)
     {
-        var query = new QueryDefinition("SELECT * FROM user WHERE c.Email = @Email")
+        var query = new QueryDefinition("SELECT * FROM c WHERE c.Email = @Email")
             .WithParameter("@Email", email);
 
         using var iterator = _container.GetItemQueryIterator<UserReg>(query);
