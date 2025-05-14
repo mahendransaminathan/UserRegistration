@@ -15,9 +15,9 @@ public class UserCosmosRepository : IUserRepository
     {
         _cosmosClient = cosmosClient;
 
-        _database = _cosmosClient.GetDatabase(configuration["CosmosDb:DatabaseName"]);
+        _database = _cosmosClient.GetDatabase(Environment.GetEnvironmentVariable("DATABASENAME"));
 
-        _container = _database.GetContainer(configuration["CosmosDb:ContainerName"]);
+        _container = _database.GetContainer(Environment.GetEnvironmentVariable("CONTAINERNAME"));
     }
 
     public async Task<UserReg> GetUserByEmail(string email)
